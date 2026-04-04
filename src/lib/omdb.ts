@@ -41,6 +41,18 @@ function getApiKey(): string {
   return key.trim();
 }
 
+/** OMDb sometimes returns the same imdbID twice; React keys must be unique. */
+function dedupeByImdbId(items: OmdbSearchItem[]): OmdbSearchItem[] {
+  const seen = new Set<string>();
+  const out: OmdbSearchItem[] = [];
+  for (const item of items) {
+    if (seen.has(item.imdbID)) continue;
+    seen.add(item.imdbID);
+    out.push(item);
+  }
+  return out;
+}
+
 export async function searchOmdb(query: string): Promise<OmdbSearchItem[]> {
   const q = query.trim();
   if (q.length < 2) return [];
@@ -61,7 +73,7 @@ export async function searchOmdb(query: string): Promise<OmdbSearchItem[]> {
     return [];
   }
 
-  return data.Search;
+  return dedupeByImdbId(data.Search);
 }
 
 export async function getOmdbByImdbId(imdbId: string): Promise<OmdbDetail> {
