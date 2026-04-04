@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  watchEntries WatchEntry[]
+}
+
+model WatchEntry {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  imdbId     String
+  userRating Int
+  watchedAt  DateTime @default(now())
+  title      String
+  type       String
+  year       String?
+  runtime    String?
+  genre      String?
+  director   String?
+  actors     String?
+  plot       String?
+  posterUrl  String?
+  rated      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, imdbId])
+  @@index([userId])
+}
