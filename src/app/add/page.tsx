@@ -18,7 +18,7 @@ export default async function AddPage() {
         <div className="absolute -left-16 top-1/3 h-48 w-48 rounded-full bg-amber-200/15 blur-3xl dark:bg-amber-950/15" />
       </div>
 
-      <div className="mx-auto flex w-full max-w-6xl flex-col px-4 py-4 sm:px-6 lg:min-h-0 lg:flex-1 lg:overflow-hidden lg:py-3">
+      <div className="flex w-full flex-col px-4 py-4 sm:px-5 md:px-6 lg:min-h-0 lg:flex-1 lg:overflow-hidden lg:px-8 lg:py-3 xl:px-10">
         <nav className="mb-3 shrink-0" aria-label="Breadcrumb">
           <Link
             href="/catalog"

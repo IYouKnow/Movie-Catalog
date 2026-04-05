@@ -169,7 +169,7 @@ export function AddMovieForm() {
           ) : null}
 
           {searchLoading ? (
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-2.5 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-2.5 md:grid-cols-5 lg:grid-cols-6 lg:gap-3 xl:grid-cols-7 2xl:grid-cols-8">
               {Array.from({ length: 8 }).map((_, i) => (
                 <div
                   key={i}
@@ -205,7 +205,7 @@ export function AddMovieForm() {
 
           {!searchLoading && !searchError && results.length > 0 ? (
             <ul
-              className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-2.5 lg:grid-cols-3 xl:grid-cols-4"
+              className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-2.5 md:grid-cols-5 lg:grid-cols-6 lg:gap-3 xl:grid-cols-7 2xl:grid-cols-8"
               role="listbox"
               aria-label="Search results"
             >

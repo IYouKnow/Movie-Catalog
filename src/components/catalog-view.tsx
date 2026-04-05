@@ -4,6 +4,8 @@ import { deleteWatchEntryForm, updateWatchRating } from "@/lib/watch-actions";
 import type { WatchEntryModel as WatchEntry } from "@/generated/prisma/models/WatchEntry";
 import Image from "next/image";
 import { useMemo, useState } from "react";
+import { ExportModal } from "@/components/export-modal";
+import { ImportModal } from "@/components/import-modal";
 
 type Tab = "all" | "movies" | "series";
 
@@ -25,10 +27,13 @@ function filterEntries(entries: WatchEntry[], tab: Tab) {
 
 type CatalogViewProps = {
   entries: WatchEntry[];
+  onImportSuccess?: () => void;
 };
 
-export function CatalogView({ entries }: CatalogViewProps) {
+export function CatalogView({ entries, onImportSuccess }: CatalogViewProps) {
   const [tab, setTab] = useState<Tab>("all");
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   const counts = useMemo(() => {
     return {
@@ -48,11 +53,12 @@ export function CatalogView({ entries }: CatalogViewProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div
-        className="flex flex-wrap gap-1 border-b border-zinc-200 dark:border-zinc-800"
-        role="tablist"
-        aria-label="Catalog type"
-      >
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-200 pb-4 dark:border-zinc-800">
+        <div
+          className="flex flex-wrap gap-1"
+          role="tablist"
+          aria-label="Catalog type"
+        >
         {tabs.map((t) => {
           const active = tab === t.id;
           return (
@@ -77,6 +83,23 @@ export function CatalogView({ entries }: CatalogViewProps) {
             </button>
           );
         })}
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setShowImportModal(true)}
+            className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          >
+            Import
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowExportModal(true)}
+            className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          >
+            Export
+          </button>
+        </div>
       </div>
 
       <div
@@ -193,9 +216,22 @@ export function CatalogView({ entries }: CatalogViewProps) {
                       <input type="hidden" name="entryId" value={entry.id} />
                       <button
                         type="submit"
-                        className="text-xs font-medium text-red-600 underline-offset-2 hover:underline dark:text-red-400"
+                        title="Remove"
+                        className="cursor-pointer rounded-md p-1.5 text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
                       >
-                        Remove
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
+                        </svg>
                       </button>
                     </form>
                   </td>
@@ -205,6 +241,16 @@ export function CatalogView({ entries }: CatalogViewProps) {
           </table>
         )}
       </div>
+
+      <ExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+      />
+      <ImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSuccess={onImportSuccess}
+      />
     </div>
   );
 }
