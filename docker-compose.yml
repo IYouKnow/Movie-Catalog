@@ -1,0 +1,18 @@
+services:
+  movie-catalog:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: movie-catalog
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: file:/app/data/movie-catalog.db
+      AUTH_SECRET: change-me-to-a-long-random-string
+      OMDB_API_KEY: your-omdb-api-key
+    volumes:
+      - movie_catalog_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  movie_catalog_data:

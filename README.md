@@ -1,36 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Movie Catalog
 
-## Getting Started
+A small personal app to track movies and series you have watched.
 
-First, run the development server:
+Features:
+
+- Email/password login
+- Search titles with OMDb
+- Save watched entries with your rating
+- Import and export your catalog
+- SQLite storage for simple self-hosting
+
+## Local Development
+
+1. Create a `.env` file based on `.env.example`.
+2. Install dependencies:
+
+```bash
+npm install
+```
+
+3. Start the app:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Docker / CasaOS
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+This project includes a lightweight Docker setup for self-hosting.
 
-## Learn More
+1. Set `AUTH_SECRET` in `docker-compose.yml`.
+2. Set `OMDB_API_KEY` in `docker-compose.yml`.
+3. Start the container:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+docker compose up -d --build
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Open `http://localhost:3000`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Notes:
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- The SQLite database is stored in a Docker volume.
+- On first boot, the container creates the database automatically.
+- For CasaOS, import `docker-compose.yml` and edit the environment values in the UI.
