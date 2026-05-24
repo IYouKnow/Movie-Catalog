@@ -1,5 +1,4 @@
 const fs = require("fs");
-const path = require("path");
 const Database = require("better-sqlite3");
 
 function getDbPath() {
@@ -11,6 +10,7 @@ function getDbPath() {
 }
 
 function ensureDir(filePath) {
+  const path = require("path");
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
 }
 
@@ -23,20 +23,9 @@ function hasCoreTables(db) {
   return names.includes("User") && names.includes("WatchEntry");
 }
 
-function runMigrations(db) {
-  const migrationsDir = "/app/prisma/migrations";
-  const entries = fs
-    .readdirSync(migrationsDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort();
-
-  for (const entry of entries) {
-    const sqlPath = path.join(migrationsDir, entry, "migration.sql");
-    if (!fs.existsSync(sqlPath)) continue;
-    const sql = fs.readFileSync(sqlPath, "utf8");
-    db.exec(sql);
-  }
+function runSchemaInit(db) {
+  const sql = fs.readFileSync("/app/init-schema.sql", "utf8");
+  db.exec(sql);
 }
 
 function main() {
@@ -46,7 +35,7 @@ function main() {
   const db = new Database(dbPath);
   try {
     if (!hasCoreTables(db)) {
-      runMigrations(db);
+      runSchemaInit(db);
     }
   } finally {
     db.close();

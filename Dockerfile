@@ -26,7 +26,7 @@ COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/docker/entrypoint.sh ./entrypoint.sh
 COPY --from=builder /app/docker/init-db.js ./init-db.js
-COPY prisma ./prisma
+COPY --from=builder /app/docker/init-schema.sql ./init-schema.sql
 
 RUN chmod +x /app/entrypoint.sh && mkdir -p /app/data
 
