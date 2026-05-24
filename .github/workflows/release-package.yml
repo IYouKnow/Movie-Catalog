@@ -10,7 +10,53 @@ permissions:
   packages: write
 
 jobs:
+  test-image:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Build test image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true
+          tags: movie-catalog:test
+          platforms: linux/amd64
+
+      - name: Start container
+        run: |
+          docker run -d \
+            --name movie-catalog-test \
+            -p 3000:3000 \
+            -e DATABASE_URL=file:/app/data/movie-catalog.db \
+            -e AUTH_SECRET=test-secret-for-ci \
+            -e OMDB_API_KEY=test-key \
+            movie-catalog:test
+
+      - name: Check HTTP response
+        run: |
+          for i in 1 2 3 4 5; do
+            if curl -fsS http://127.0.0.1:3000/register > /tmp/register.html; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs movie-catalog-test
+          exit 1
+
+      - name: Check bundled database schema
+        run: |
+          docker exec movie-catalog-test node -e "const Database=require('better-sqlite3'); const db=new Database('/app/data/movie-catalog.db'); const names=db.prepare(\"select name from sqlite_master where type='table' order by name\").all().map((row)=>row.name); if (!names.includes('User') || !names.includes('WatchEntry')) { console.error(names); process.exit(1); }"
+
+      - name: Clean up test container
+        if: always()
+        run: docker rm -f movie-catalog-test || true
+
   docker:
+    needs: test-image
     runs-on: ubuntu-latest
 
     steps:
@@ -40,6 +86,7 @@ jobs:
           images: ${{ env.IMAGE_NAME }}
           tags: |
             type=ref,event=tag
+            type=raw,value=latest
 
       - name: Build and push image
         uses: docker/build-push-action@v6

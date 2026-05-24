@@ -1,6 +1,6 @@
 services:
   movie-catalog:
-    image: ghcr.io/iyouknow/catalog:v0.1.0
+    image: ghcr.io/iyouknow/catalog:latest
     container_name: movie-catalog
     ports:
       - "3000:3000"

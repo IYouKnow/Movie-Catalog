@@ -53,13 +53,13 @@ For CasaOS, use [docker-compose.casaos.yml](/d:/3DEV/Code/1Projects/8MovieCatalo
 
 It is different in two important ways:
 
-- It uses a published image: `ghcr.io/iyouknow/catalog:v0.1.0`
+- It uses a published image: `ghcr.io/iyouknow/catalog:latest`
 - It stores the database in `/DATA/AppData/movie-catalog` on the host
 
 If you install it manually in CasaOS, use:
 
 - Docker Image: `ghcr.io/iyouknow/catalog`
-- Tag: `v0.1.0`
+- Tag: `latest` or a newer fixed release such as `v0.1.1`
 - Host port: `3000`
 - Container port: `3000`
 - Volume: `/DATA/AppData/movie-catalog` -> `/app/data`
