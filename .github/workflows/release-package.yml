@@ -49,7 +49,20 @@ jobs:
 
       - name: Check bundled database schema
         run: |
-          docker exec movie-catalog-test node -e "const Database=require('better-sqlite3'); const db=new Database('/app/data/movie-catalog.db'); const names=db.prepare(\"select name from sqlite_master where type='table' order by name\").all().map((row)=>row.name); if (!names.includes('User') || !names.includes('WatchEntry')) { console.error(names); process.exit(1); }"
+          cat > check-db.js <<'"'"'EOF'"'"'
+          const Database = require("better-sqlite3");
+          const db = new Database("/app/data/movie-catalog.db");
+          const names = db
+            .prepare("select name from sqlite_master where type = 'table' order by name")
+            .all()
+            .map((row) => row.name);
+          if (!names.includes("User") || !names.includes("WatchEntry")) {
+            console.error(names);
+            process.exit(1);
+          }
+          EOF
+          docker cp check-db.js movie-catalog-test:/check-db.js
+          docker exec movie-catalog-test node /check-db.js
 
       - name: Clean up test container
         if: always()

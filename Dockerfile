@@ -12,7 +12,6 @@ RUN npm ci
 
 FROM deps AS builder
 COPY . .
-RUN npx prisma migrate deploy
 RUN npm run build
 
 FROM node:22-alpine AS runner
@@ -25,8 +24,9 @@ ENV HOSTNAME=0.0.0.0
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/prisma-template.db ./prisma-template.db
+COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/docker/entrypoint.sh ./entrypoint.sh
+COPY --from=builder /app/docker/init-db.js ./init-db.js
 
 RUN chmod +x /app/entrypoint.sh && mkdir -p /app/data
 
