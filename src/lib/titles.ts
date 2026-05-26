@@ -119,6 +119,20 @@ type TmdbTvDetail = {
   created_by?: Array<{ name: string }>;
 };
 
+type TmdbTrendingMovieItem = {
+  id: number;
+  title: string;
+  release_date?: string;
+  poster_path?: string | null;
+};
+
+type TmdbTrendingTvItem = {
+  id: number;
+  name: string;
+  first_air_date?: string;
+  poster_path?: string | null;
+};
+
 function emptyToNull(value: string | null | undefined): string | null {
   if (!value || value === "N/A") return null;
   return value;
@@ -473,6 +487,40 @@ export async function searchTitles(query: string): Promise<CatalogSearchItem[]> 
     dedupeMergedResults([...omdbResults, ...tmdbResults]),
     q,
   );
+}
+
+export async function getFeaturedTitles(): Promise<CatalogSearchItem[]> {
+  if (!getTmdbReadToken() && !getTmdbApiKey()) {
+    return [];
+  }
+
+  const [movies, tv] = await Promise.all([
+    fetchTmdb<TmdbSearchResponse<TmdbTrendingMovieItem>>("/trending/movie/day"),
+    fetchTmdb<TmdbSearchResponse<TmdbTrendingTvItem>>("/trending/tv/day"),
+  ]);
+
+  const items: CatalogSearchItem[] = [
+    ...(movies.results ?? []).slice(0, 8).map((item) => ({
+      title: item.title,
+      year: yearFromDate(item.release_date),
+      imdbId: null,
+      type: "movie" as const,
+      posterUrl: posterFromTmdb(item.poster_path),
+      source: "tmdb" as const,
+      sourceId: `movie:${item.id}`,
+    })),
+    ...(tv.results ?? []).slice(0, 8).map((item) => ({
+      title: item.name,
+      year: yearFromDate(item.first_air_date),
+      imdbId: null,
+      type: "series" as const,
+      posterUrl: posterFromTmdb(item.poster_path),
+      source: "tmdb" as const,
+      sourceId: `tv:${item.id}`,
+    })),
+  ];
+
+  return dedupeMergedResults(items);
 }
 
 export async function getTitleDetail(

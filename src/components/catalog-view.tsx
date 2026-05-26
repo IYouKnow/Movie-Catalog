@@ -3,11 +3,12 @@
 import { deleteWatchEntryForm, updateWatchRating } from "@/lib/watch-actions";
 import type { WatchEntryModel as WatchEntry } from "@/generated/prisma/models/WatchEntry";
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ExportModal } from "@/components/export-modal";
 import { ImportModal } from "@/components/import-modal";
 
 type Tab = "all" | "movies" | "series";
+const PAGE_SIZE = 12;
 
 function isMovieType(type: string) {
   return type.toLowerCase() === "movie";
@@ -34,6 +35,7 @@ export function CatalogView({ entries, onImportSuccess }: CatalogViewProps) {
   const [tab, setTab] = useState<Tab>("all");
   const [showExportModal, setShowExportModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [page, setPage] = useState(1);
 
   const counts = useMemo(() => {
     return {
@@ -44,6 +46,17 @@ export function CatalogView({ entries, onImportSuccess }: CatalogViewProps) {
   }, [entries]);
 
   const filtered = useMemo(() => filterEntries(entries, tab), [entries, tab]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pagedEntries = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   const tabs: { id: Tab; label: string; count: number }[] = [
     { id: "all", label: "All", count: counts.all },
@@ -69,7 +82,10 @@ export function CatalogView({ entries, onImportSuccess }: CatalogViewProps) {
               aria-selected={active}
               id={`tab-${t.id}`}
               aria-controls={`panel-${t.id}`}
-              onClick={() => setTab(t.id)}
+              onClick={() => {
+                setTab(t.id);
+                setPage(1);
+              }}
               className={`relative -mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition ${
                 active
                   ? "border-zinc-900 text-zinc-900 dark:border-zinc-100 dark:text-zinc-50"
@@ -144,7 +160,7 @@ export function CatalogView({ entries, onImportSuccess }: CatalogViewProps) {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((entry) => (
+              {pagedEntries.map((entry) => (
                 <tr
                   key={entry.id}
                   className="border-b border-zinc-100 bg-white last:border-0 dark:border-zinc-800/80 dark:bg-zinc-950"
@@ -241,6 +257,36 @@ export function CatalogView({ entries, onImportSuccess }: CatalogViewProps) {
           </table>
         )}
       </div>
+
+      {filtered.length > PAGE_SIZE ? (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            Showing {(page - 1) * PAGE_SIZE + 1}-
+            {Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={page === 1}
+              className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              Previous
+            </button>
+            <span className="min-w-20 text-center text-sm text-zinc-600 dark:text-zinc-400">
+              Page {page} / {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              disabled={page === totalPages}
+              className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <ExportModal
         isOpen={showExportModal}

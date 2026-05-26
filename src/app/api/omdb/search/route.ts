@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { searchTitles } from "@/lib/titles";
+import { getFeaturedTitles, searchTitles } from "@/lib/titles";
 import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
@@ -12,6 +12,10 @@ export async function GET(req: Request) {
   const q = searchParams.get("q") ?? "";
 
   try {
+    if (q.trim().length < 2) {
+      const results = await getFeaturedTitles();
+      return NextResponse.json({ results });
+    }
     const results = await searchTitles(q);
     return NextResponse.json({ results });
   } catch (e) {

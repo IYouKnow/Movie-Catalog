@@ -1,11 +1,20 @@
 "use client";
 
 import { addWatchEntry, type AddWatchState } from "@/lib/watch-actions";
-import type { CatalogSearchItem } from "@/lib/titles";
+import type { CatalogSearchItem, CatalogTitleType } from "@/lib/titles";
 import Link from "next/link";
-import { useActionState, useEffect, useState, type ReactNode } from "react";
+import {
+  useActionState,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 
 const initial: AddWatchState = {};
+
+type TypeFilter = "all" | CatalogTitleType;
+type SortMode = "match" | "newest" | "oldest" | "title";
 
 function PosterImg({
   src,
@@ -52,6 +61,11 @@ function SearchIcon({ className }: { className?: string }) {
   );
 }
 
+function parseYear(year: string): number {
+  const match = year.match(/\d{4}/);
+  return match ? Number.parseInt(match[0], 10) : 0;
+}
+
 export function AddMovieForm() {
   const [state, formAction, pending] = useActionState(addWatchEntry, initial);
   const [query, setQuery] = useState("");
@@ -61,6 +75,9 @@ export function AddMovieForm() {
   const [selected, setSelected] = useState<CatalogSearchItem | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [rating, setRating] = useState(7);
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [yearFilter, setYearFilter] = useState("all");
+  const [sortMode, setSortMode] = useState<SortMode>("match");
 
   useEffect(() => {
     if (!state?.ok) return;
@@ -73,23 +90,17 @@ export function AddMovieForm() {
 
   useEffect(() => {
     const q = query.trim();
-    if (q.length < 2) {
-      setResults([]);
-      setSearchError(null);
-      setSearchLoading(false);
-      return;
-    }
-
     const ac = new AbortController();
     const id = setTimeout(() => {
       void (async () => {
         setSearchLoading(true);
         setSearchError(null);
         try {
-          const res = await fetch(
-            `/api/omdb/search?q=${encodeURIComponent(q)}`,
-            { signal: ac.signal },
-          );
+          const path =
+            q.length >= 2
+              ? `/api/omdb/search?q=${encodeURIComponent(q)}`
+              : "/api/omdb/search";
+          const res = await fetch(path, { signal: ac.signal });
           const data: { results?: CatalogSearchItem[]; error?: string } =
             await res.json();
           if (!res.ok) {
@@ -106,7 +117,7 @@ export function AddMovieForm() {
           if (!ac.signal.aborted) setSearchLoading(false);
         }
       })();
-    }, 350);
+    }, q.length >= 2 ? 350 : 0);
 
     return () => {
       clearTimeout(id);
@@ -118,12 +129,52 @@ export function AddMovieForm() {
     if (selected) setSuccessMsg(null);
   }, [selected]);
 
+  const yearOptions = useMemo(() => {
+    const years = Array.from(
+      new Set(results.map((item) => item.year).filter(Boolean)),
+    ).sort((a, b) => parseYear(b) - parseYear(a));
+    return years;
+  }, [results]);
+
+  const filteredResults = useMemo(() => {
+    let next = results;
+
+    if (typeFilter !== "all") {
+      next = next.filter((item) => item.type === typeFilter);
+    }
+
+    if (yearFilter !== "all") {
+      next = next.filter((item) => item.year === yearFilter);
+    }
+
+    if (sortMode === "newest") {
+      next = [...next].sort((a, b) => parseYear(b.year) - parseYear(a.year));
+    } else if (sortMode === "oldest") {
+      next = [...next].sort((a, b) => parseYear(a.year) - parseYear(b.year));
+    } else if (sortMode === "title") {
+      next = [...next].sort((a, b) => a.title.localeCompare(b.title));
+    }
+
+    return next;
+  }, [results, sortMode, typeFilter, yearFilter]);
+
+  useEffect(() => {
+    if (!selected) return;
+    const stillVisible = filteredResults.some(
+      (item) =>
+        item.source === selected.source && item.sourceId === selected.sourceId,
+    );
+    if (!stillVisible) {
+      setSelected(null);
+    }
+  }, [filteredResults, selected]);
+
   const qTrim = query.trim();
+  const showingFeatured = qTrim.length < 2;
   const showEmptyHint =
-    qTrim.length >= 2 &&
     !searchLoading &&
     !searchError &&
-    results.length === 0;
+    filteredResults.length === 0;
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-5">
@@ -134,7 +185,7 @@ export function AddMovieForm() {
         <div className="relative shrink-0">
           <label
             htmlFor="search"
-            className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400 sm:text-sm sm:text-zinc-700 sm:dark:text-zinc-300"
+            className="mb-1 block text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
           >
             Search titles
           </label>
@@ -145,32 +196,81 @@ export function AddMovieForm() {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Film or show name..."
+              placeholder="Search for a movie or series..."
               autoComplete="off"
-              className="h-10 w-full rounded-xl border border-zinc-200/80 bg-white/90 pl-10 pr-3 text-sm text-zinc-900 shadow-sm outline-none ring-zinc-400/25 transition placeholder:text-zinc-400 focus:border-zinc-300 focus:ring-2 dark:border-zinc-700/80 dark:bg-zinc-900/80 dark:text-zinc-50 dark:placeholder:text-zinc-500 dark:focus:border-zinc-600 dark:focus:ring-zinc-600/20 sm:h-11 sm:pl-11 sm:text-[0.9375rem]"
+              className="h-11 w-full rounded-2xl border border-zinc-200/80 bg-white/90 pl-10 pr-3 text-sm text-zinc-900 shadow-sm outline-none ring-zinc-400/25 transition placeholder:text-zinc-400 focus:border-zinc-300 focus:ring-2 dark:border-zinc-700/80 dark:bg-zinc-900/80 dark:text-zinc-50 dark:placeholder:text-zinc-500 dark:focus:border-zinc-600 dark:focus:ring-zinc-600/20"
             />
           </div>
           <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-500 sm:text-xs">
-            OMDb first, TMDB fallback if OMDb has no match.
+            {showingFeatured
+              ? "Browse featured titles or start typing to search."
+              : "OMDb first, TMDB fills in missing matches."}
           </p>
+        </div>
+
+        <div className="grid gap-3 rounded-2xl border border-zinc-200/80 bg-gradient-to-br from-white via-zinc-50/90 to-zinc-100/70 p-3 shadow-sm backdrop-blur-sm dark:border-zinc-800/80 dark:from-zinc-950 dark:via-zinc-950/80 dark:to-zinc-900/70 sm:grid-cols-3">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+              Type
+            </span>
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value as TypeFilter)}
+              className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-800 shadow-sm outline-none focus:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+            >
+              <option value="all">All titles</option>
+              <option value="movie">Movies</option>
+              <option value="series">Series</option>
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+              Year
+            </span>
+            <select
+              value={yearFilter}
+              onChange={(e) => setYearFilter(e.target.value)}
+              className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-800 shadow-sm outline-none focus:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+            >
+              <option value="all">Any year</option>
+              {yearOptions.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+              Sort
+            </span>
+            <select
+              value={sortMode}
+              onChange={(e) => setSortMode(e.target.value as SortMode)}
+              className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-800 shadow-sm outline-none focus:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+            >
+              <option value="match">Best match</option>
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="title">Title A-Z</option>
+            </select>
+          </label>
         </div>
 
         <div
           className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-200/80 bg-white/60 shadow-sm backdrop-blur-sm dark:border-zinc-800/80 dark:bg-zinc-950/40"
           aria-live="polite"
         >
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-3.5">
-            {qTrim.length < 2 ? (
-              <div className="flex flex-col items-center justify-center gap-2 py-10 text-center lg:py-8">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-100 dark:bg-zinc-800/80">
-                  <SearchIcon className="h-5 w-5 text-zinc-400 dark:text-zinc-500" />
-                </div>
-                <p className="max-w-[240px] text-xs text-zinc-600 dark:text-zinc-400 sm:text-sm">
-                  Type to search, then tap a poster to select.
-                </p>
-              </div>
-            ) : null}
+          <div className="flex items-center justify-between border-b border-zinc-200/80 px-3 py-2 text-xs text-zinc-500 dark:border-zinc-800/80 dark:text-zinc-400 sm:px-4">
+            <span>
+              {showingFeatured ? "Featured titles" : "Search results"}
+            </span>
+            <span>{filteredResults.length} shown</span>
+          </div>
 
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-3.5">
             {searchLoading ? (
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-2.5 md:grid-cols-5 lg:grid-cols-6 lg:gap-3 xl:grid-cols-7 2xl:grid-cols-8">
                 {Array.from({ length: 8 }).map((_, i) => (
@@ -197,22 +297,24 @@ export function AddMovieForm() {
               </div>
             ) : null}
 
-            {showEmptyHint ? (
+            {showEmptyHint && !searchLoading && !searchError ? (
               <div className="flex flex-col items-center justify-center gap-1.5 py-10 text-center">
-                <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">No titles found</p>
+                <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  No titles match these filters
+                </p>
                 <p className="max-w-sm text-xs text-zinc-500 dark:text-zinc-400">
-                  Try another spelling or a shorter phrase.
+                  Try another spelling or broaden the year and type filters.
                 </p>
               </div>
             ) : null}
 
-            {!searchLoading && !searchError && results.length > 0 ? (
+            {!searchLoading && !searchError && filteredResults.length > 0 ? (
               <ul
                 className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-2.5 md:grid-cols-5 lg:grid-cols-6 lg:gap-3 xl:grid-cols-7 2xl:grid-cols-8"
                 role="listbox"
                 aria-label="Search results"
               >
-                {results.map((item) => {
+                {filteredResults.map((item) => {
                   const active =
                     selected?.source === item.source &&
                     selected?.sourceId === item.sourceId;
@@ -255,10 +357,6 @@ export function AddMovieForm() {
                               ·
                             </span>
                             <span className="capitalize">{item.type}</span>
-                            <span className="text-zinc-300 dark:text-zinc-600" aria-hidden>
-                              ·
-                            </span>
-                            <span className="uppercase">{item.source}</span>
                           </span>
                         </div>
                       </button>
@@ -311,8 +409,6 @@ export function AddMovieForm() {
                   {selected.year || "Unknown"}
                   <span className="mx-1.5 text-zinc-300 dark:text-zinc-600">·</span>
                   <span className="capitalize">{selected.type}</span>
-                  <span className="mx-1.5 text-zinc-300 dark:text-zinc-600">·</span>
-                  <span className="uppercase">{selected.source}</span>
                 </p>
               </div>
             </div>
