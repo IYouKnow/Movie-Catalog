@@ -13,8 +13,9 @@ export default async function Home() {
           Your watched movies and series, in one place
         </h1>
         <p className="text-lg leading-relaxed text-zinc-600 dark:text-zinc-400">
-          Log what you have watched, rate it, and keep rich details from the OMDb API—genres, cast, plot, and more. Sign in to
-          see only your catalog.
+          Log what you have watched, rate it, and keep rich details from OMDb
+          with TMDB as a fallback when OMDb misses a title. Sign in to see only
+          your catalog.
         </p>
       </div>
       <div className="flex flex-col gap-3 sm:flex-row">
@@ -41,7 +42,15 @@ export default async function Home() {
         >
           OMDb
         </a>{" "}
-        set in your server environment as <code className="rounded bg-zinc-200 px-1 py-0.5 text-xs dark:bg-zinc-800">OMDB_API_KEY</code>.
+        set in your server environment as{" "}
+        <code className="rounded bg-zinc-200 px-1 py-0.5 text-xs dark:bg-zinc-800">
+          OMDB_API_KEY
+        </code>
+        . You can optionally add{" "}
+        <code className="rounded bg-zinc-200 px-1 py-0.5 text-xs dark:bg-zinc-800">
+          TMDB_API_READ_TOKEN
+        </code>{" "}
+        for fallback search.
       </p>
     </div>
   );

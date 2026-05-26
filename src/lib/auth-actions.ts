@@ -2,6 +2,7 @@
 
 import { signIn, signOut } from "@/auth";
 import bcrypt from "bcryptjs";
+import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -17,6 +18,10 @@ export async function signOutAction(): Promise<void> {
 
 export type LoginState = { error?: string };
 
+function isCredentialsSignInError(error: unknown): boolean {
+  return error instanceof AuthError && error.type === "CredentialsSignin";
+}
+
 export async function loginAction(
   _prev: LoginState | undefined,
   formData: FormData,
@@ -31,14 +36,21 @@ export async function loginAction(
     return { error: "Email and password are required." };
   }
 
-  const result = await signIn("credentials", {
-    email,
-    password,
-    redirect: false,
-  });
+  try {
+    const result = await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
 
-  if (result?.error) {
-    return { error: "Invalid email or password." };
+    if (result?.error) {
+      return { error: "Invalid email or password." };
+    }
+  } catch (error) {
+    if (isCredentialsSignInError(error)) {
+      return { error: "Invalid email or password." };
+    }
+    throw error;
   }
 
   redirect(nextPath);
@@ -100,16 +112,25 @@ export async function registerAction(
     throw e;
   }
 
-  const result = await signIn("credentials", {
-    email,
-    password: parsed.data.password,
-    redirect: false,
-  });
+  try {
+    const result = await signIn("credentials", {
+      email,
+      password: parsed.data.password,
+      redirect: false,
+    });
 
-  if (result?.error) {
-    return {
-      error: "Account created. Please sign in with your email and password.",
-    };
+    if (result?.error) {
+      return {
+        error: "Account created. Please sign in with your email and password.",
+      };
+    }
+  } catch (error) {
+    if (isCredentialsSignInError(error)) {
+      return {
+        error: "Account created. Please sign in with your email and password.",
+      };
+    }
+    throw error;
   }
 
   redirect("/catalog");

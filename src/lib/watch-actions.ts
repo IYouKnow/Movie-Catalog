@@ -2,7 +2,7 @@
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getOmdbByImdbId } from "@/lib/omdb";
+import { getTitleDetail } from "@/lib/titles";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -12,7 +12,9 @@ function emptyToNull(v: string | undefined | null): string | null {
 }
 
 const addSchema = z.object({
-  imdbId: z.string().min(2),
+  imdbId: z.string().optional().default(""),
+  source: z.enum(["omdb", "tmdb"]),
+  sourceId: z.string().min(1),
   userRating: z.coerce.number().int().min(1).max(10),
 });
 
@@ -29,6 +31,8 @@ export async function addWatchEntry(
 
   const parsed = addSchema.safeParse({
     imdbId: formData.get("imdbId"),
+    source: formData.get("source"),
+    sourceId: formData.get("sourceId"),
     userRating: formData.get("userRating"),
   });
 
@@ -38,32 +42,33 @@ export async function addWatchEntry(
 
   let detail;
   try {
-    detail = await getOmdbByImdbId(parsed.data.imdbId);
+    detail = await getTitleDetail(
+      parsed.data.source,
+      parsed.data.sourceId,
+      parsed.data.imdbId,
+    );
   } catch (e) {
     return {
       error: e instanceof Error ? e.message : "Could not load title details.",
     };
   }
 
-  const posterUrl =
-    detail.Poster && detail.Poster !== "N/A" ? detail.Poster : null;
-
   try {
     await prisma.watchEntry.create({
       data: {
         userId: session.user.id,
-        imdbId: detail.imdbID,
+        imdbId: detail.imdbId,
         userRating: parsed.data.userRating,
-        title: detail.Title,
-        type: detail.Type,
-        year: emptyToNull(detail.Year),
-        runtime: emptyToNull(detail.Runtime),
-        genre: emptyToNull(detail.Genre),
-        director: emptyToNull(detail.Director),
-        actors: emptyToNull(detail.Actors),
-        plot: emptyToNull(detail.Plot),
-        posterUrl,
-        rated: emptyToNull(detail.Rated),
+        title: detail.title,
+        type: detail.type,
+        year: emptyToNull(detail.year),
+        runtime: emptyToNull(detail.runtime),
+        genre: emptyToNull(detail.genre),
+        director: emptyToNull(detail.director),
+        actors: emptyToNull(detail.actors),
+        plot: emptyToNull(detail.plot),
+        posterUrl: emptyToNull(detail.posterUrl),
+        rated: emptyToNull(detail.rated),
       },
     });
   } catch (e: unknown) {

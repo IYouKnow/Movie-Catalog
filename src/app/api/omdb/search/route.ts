@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { searchOmdb } from "@/lib/omdb";
+import { searchTitles } from "@/lib/titles";
 import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
@@ -12,7 +12,7 @@ export async function GET(req: Request) {
   const q = searchParams.get("q") ?? "";
 
   try {
-    const results = await searchOmdb(q);
+    const results = await searchTitles(q);
     return NextResponse.json({ results });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Search failed";

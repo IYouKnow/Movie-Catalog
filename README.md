@@ -5,7 +5,7 @@ A small personal app to track movies and series you have watched.
 Features:
 
 - Email/password login
-- Search titles with OMDb
+- Search titles with OMDb and optional TMDB fallback
 - Save watched entries with your rating
 - Import and export your catalog
 - SQLite storage for simple self-hosting
@@ -26,6 +26,11 @@ npm run dev
 ```
 
 Open `http://localhost:3000`.
+
+Optional:
+
+- Add `TMDB_API_READ_TOKEN` if you want fallback search when OMDb has no results.
+- If you use TMDB data, include their required attribution in your deployment.
 
 ## Docker / CasaOS
 

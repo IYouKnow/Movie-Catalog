@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { EXPORT_COLUMNS, ExportFormat } from "@/lib/export-types";
-import { getOmdbByImdbId } from "@/lib/omdb";
+import { getTitleDetail } from "@/lib/titles";
 
 function emptyToNull(v: string | undefined | null): string | null {
   if (v == null || v === "" || v === "N/A") return null;
@@ -178,12 +178,12 @@ export async function importEntries(
     const rating = ratingStr ? parseInt(String(ratingStr), 10) : null;
     const watchDateStr = entry.watchedAt || entry.watchedDate;
 
-    let omdbDetail = null;
+    let detail = null;
     if (imdbId) {
       try {
-        omdbDetail = await getOmdbByImdbId(imdbId);
+        detail = await getTitleDetail("omdb", imdbId, imdbId);
       } catch {
-        // OMDb fetch failed, continue with imported data
+        // Metadata fetch failed, continue with imported data
       }
     }
 
@@ -193,15 +193,15 @@ export async function importEntries(
           userId: session.user.id,
           imdbId: imdbId || `import-${Date.now()}-${Math.random().toString(36).slice(2)}`,
           title,
-          type: omdbDetail?.Type || entry.type?.trim() || "movie",
-          year: emptyToNull(entry.year?.trim()) || emptyToNull(omdbDetail?.Year),
-          runtime: emptyToNull(entry.runtime?.trim()) || emptyToNull(omdbDetail?.Runtime),
-          genre: emptyToNull(entry.genre?.trim()) || emptyToNull(omdbDetail?.Genre),
-          director: emptyToNull(entry.director?.trim()) || emptyToNull(omdbDetail?.Director),
-          actors: emptyToNull(entry.actors?.trim()) || emptyToNull(omdbDetail?.Actors),
-          plot: emptyToNull(entry.plot?.trim()) || emptyToNull(omdbDetail?.Plot),
-          rated: emptyToNull(entry.rated?.trim()) || emptyToNull(omdbDetail?.Rated),
-          posterUrl: omdbDetail?.Poster && omdbDetail.Poster !== "N/A" ? omdbDetail.Poster : null,
+          type: detail?.type || entry.type?.trim() || "movie",
+          year: emptyToNull(entry.year?.trim()) || emptyToNull(detail?.year),
+          runtime: emptyToNull(entry.runtime?.trim()) || emptyToNull(detail?.runtime),
+          genre: emptyToNull(entry.genre?.trim()) || emptyToNull(detail?.genre),
+          director: emptyToNull(entry.director?.trim()) || emptyToNull(detail?.director),
+          actors: emptyToNull(entry.actors?.trim()) || emptyToNull(detail?.actors),
+          plot: emptyToNull(entry.plot?.trim()) || emptyToNull(detail?.plot),
+          rated: emptyToNull(entry.rated?.trim()) || emptyToNull(detail?.rated),
+          posterUrl: emptyToNull(detail?.posterUrl),
           userRating: rating !== null && rating >= 1 && rating <= 10 ? rating : 5,
           watchedAt: watchDateStr ? new Date(watchDateStr) : new Date(),
         },
