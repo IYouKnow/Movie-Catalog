@@ -137,6 +137,15 @@ function getTmdbReadToken(): string | null {
   return token || null;
 }
 
+function getTmdbApiKey(): string | null {
+  const key = process.env.TMDB_API_KEY?.trim();
+  return key || null;
+}
+
+function isLikelyTmdbReadToken(value: string): boolean {
+  return value.split(".").length === 3;
+}
+
 function normalizeTitleType(value: string | undefined): CatalogTitleType {
   return value === "series" || value === "tv" ? "series" : "movie";
 }
@@ -193,10 +202,55 @@ function dedupeBySource(items: CatalogSearchItem[]): CatalogSearchItem[] {
   return out;
 }
 
+function normalizeSearchText(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ");
+}
+
+function dedupeMergedResults(items: CatalogSearchItem[]): CatalogSearchItem[] {
+  const seen = new Set<string>();
+  const out: CatalogSearchItem[] = [];
+
+  for (const item of items) {
+    const key = item.imdbId
+      ? `imdb:${item.imdbId}`
+      : `${item.type}:${normalizeSearchText(item.title)}:${item.year}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+
+  return out;
+}
+
+function scoreSearchItem(item: CatalogSearchItem, query: string): number {
+  const q = normalizeSearchText(query);
+  const title = normalizeSearchText(item.title);
+  if (title === q) return 400;
+  if (title.startsWith(`${q} `) || title.endsWith(` ${q}`)) return 250;
+  if (title.startsWith(q)) return 200;
+  if (title.includes(q)) return 120;
+  return 0;
+}
+
+function sortSearchResults(items: CatalogSearchItem[], query: string): CatalogSearchItem[] {
+  return [...items].sort((a, b) => {
+    const scoreDiff = scoreSearchItem(b, query) - scoreSearchItem(a, query);
+    if (scoreDiff !== 0) return scoreDiff;
+    if (a.source !== b.source) return a.source === "omdb" ? -1 : 1;
+    const yearA = Number.parseInt(a.year, 10) || 0;
+    const yearB = Number.parseInt(b.year, 10) || 0;
+    return yearB - yearA;
+  });
+}
+
 async function fetchTmdb<T>(path: string, searchParams?: Record<string, string>): Promise<T> {
   const token = getTmdbReadToken();
-  if (!token) {
-    throw new Error("TMDB_API_READ_TOKEN is not configured");
+  const apiKey = getTmdbApiKey();
+  const legacyApiKey = token && !isLikelyTmdbReadToken(token) ? token : null;
+  const finalApiKey = apiKey || legacyApiKey;
+
+  if (!token && !finalApiKey) {
+    throw new Error("TMDB_API_READ_TOKEN or TMDB_API_KEY is not configured");
   }
 
   const url = new URL(`${TMDB_BASE}${path}`);
@@ -204,12 +258,20 @@ async function fetchTmdb<T>(path: string, searchParams?: Record<string, string>)
     url.searchParams.set(key, value);
   }
 
+  if (finalApiKey) {
+    url.searchParams.set("api_key", finalApiKey);
+  }
+
   const res = await fetch(url.toString(), {
     cache: "no-store",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
+    headers: token && isLikelyTmdbReadToken(token)
+      ? {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        }
+      : {
+          Accept: "application/json",
+        },
   });
 
   if (!res.ok) {
@@ -248,19 +310,30 @@ async function searchOmdb(query: string): Promise<CatalogSearchItem[]> {
 }
 
 async function searchTmdb(query: string): Promise<CatalogSearchItem[]> {
-  const [movies, tv] = await Promise.all([
-    fetchTmdb<TmdbSearchResponse<TmdbSearchMovieItem>>("/search/movie", {
-      query,
-      include_adult: "false",
-    }),
-    fetchTmdb<TmdbSearchResponse<TmdbSearchTvItem>>("/search/tv", {
-      query,
-      include_adult: "false",
-    }),
+  const pages = [1, 2, 3];
+  const [moviePages, tvPages] = await Promise.all([
+    Promise.all(
+      pages.map((page) =>
+        fetchTmdb<TmdbSearchResponse<TmdbSearchMovieItem>>("/search/movie", {
+          query,
+          include_adult: "false",
+          page: String(page),
+        }),
+      ),
+    ),
+    Promise.all(
+      pages.map((page) =>
+        fetchTmdb<TmdbSearchResponse<TmdbSearchTvItem>>("/search/tv", {
+          query,
+          include_adult: "false",
+          page: String(page),
+        }),
+      ),
+    ),
   ]);
 
-  return [
-    ...(movies.results ?? []).map((item) => ({
+  const movieItems = moviePages.flatMap((page) =>
+    (page.results ?? []).map((item) => ({
       title: item.title,
       year: yearFromDate(item.release_date),
       imdbId: null,
@@ -269,7 +342,10 @@ async function searchTmdb(query: string): Promise<CatalogSearchItem[]> {
       source: "tmdb" as const,
       sourceId: `movie:${item.id}`,
     })),
-    ...(tv.results ?? []).map((item) => ({
+  );
+
+  const tvItems = tvPages.flatMap((page) =>
+    (page.results ?? []).map((item) => ({
       title: item.name,
       year: yearFromDate(item.first_air_date),
       imdbId: null,
@@ -278,7 +354,9 @@ async function searchTmdb(query: string): Promise<CatalogSearchItem[]> {
       source: "tmdb" as const,
       sourceId: `tv:${item.id}`,
     })),
-  ];
+  );
+
+  return sortSearchResults([...movieItems, ...tvItems], query);
 }
 
 async function getOmdbByImdbId(imdbId: string): Promise<CatalogTitleDetail> {
@@ -370,16 +448,31 @@ export async function searchTitles(query: string): Promise<CatalogSearchItem[]> 
   const q = query.trim();
   if (q.length < 2) return [];
 
-  const omdbResults = await searchOmdb(q);
-  if (omdbResults.length > 0) {
-    return dedupeBySource(omdbResults);
-  }
+  const tmdbEnabled = Boolean(getTmdbReadToken());
+  const [omdbResult, tmdbResult] = await Promise.allSettled([
+    searchOmdb(q),
+    tmdbEnabled ? searchTmdb(q) : Promise.resolve([] as CatalogSearchItem[]),
+  ]);
 
-  if (!getTmdbReadToken()) {
+  const omdbResults =
+    omdbResult.status === "fulfilled" ? dedupeBySource(omdbResult.value) : [];
+  const tmdbResults =
+    tmdbResult.status === "fulfilled" ? dedupeBySource(tmdbResult.value) : [];
+
+  if (omdbResults.length === 0 && tmdbResults.length === 0) {
+    if (omdbResult.status === "rejected") {
+      throw omdbResult.reason;
+    }
+    if (tmdbEnabled && tmdbResult.status === "rejected") {
+      throw tmdbResult.reason;
+    }
     return [];
   }
 
-  return dedupeBySource(await searchTmdb(q));
+  return sortSearchResults(
+    dedupeMergedResults([...omdbResults, ...tmdbResults]),
+    q,
+  );
 }
 
 export async function getTitleDetail(
